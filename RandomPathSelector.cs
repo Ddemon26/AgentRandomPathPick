@@ -1,40 +1,60 @@
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections.Generic;
 
-// Manages random path selection for an agent.
-public class RandomPathSelector : MonoBehaviour
+public static class PathFinder
 {
-    [SerializeField] // Use SerializeField to keep agent private but settable in inspector
-    private NavMeshAgent agent; // Reference to the NavMeshAgent component
-
-    [SerializeField]
-    private Transform[] possibleDestinations; // Holds possible destinations for the agent
-
-    // Initialize the component.
-    private void Start()
+    public static NavMeshPath FindRandomPath(NavMeshAgent agent, Vector3 destination, float pathAlterationRadius = 2f, int maxPathsToConsider = 5)
     {
-        if (agent == null)
+        List<NavMeshPath> paths = new List<NavMeshPath>();
+        List<float> pathLengths = new List<float>();
+
+        for (int i = 0; i < maxPathsToConsider; i++)
         {
-            Debug.LogError("NavMeshAgent component is not assigned in the inspector.", this);
-            return;
+            NavMeshPath path = new NavMeshPath();
+            Vector3 alteredDestination = destination + Random.insideUnitSphere * pathAlterationRadius;
+            alteredDestination.y = destination.y;
+
+            if (agent.CalculatePath(alteredDestination, path))
+            {
+                paths.Add(path);
+                pathLengths.Add(CalculatePathLength(path));
+            }
         }
-        
-        ChooseRandomDestination();
+
+        if (paths.Count == 0) return null;
+
+        int shortestPathIndex = FindShortestPathIndex(pathLengths);
+        return paths[shortestPathIndex];
     }
 
-    // Chooses a random destination from the possible destinations and sets the agent's destination.
-    private void ChooseRandomDestination()
+    private static int FindShortestPathIndex(List<float> pathLengths)
     {
-        if (possibleDestinations == null || possibleDestinations.Length == 0)
+        int index = 0;
+        float shortestLength = float.MaxValue;
+
+        for (int i = 0; i < pathLengths.Count; i++)
         {
-            Debug.LogError("No destinations are set for the agent.", this);
-            return;
+            if (pathLengths[i] < shortestLength)
+            {
+                shortestLength = pathLengths[i];
+                index = i;
+            }
         }
 
-        // Pick a random index from the possible destinations
-        int destinationIndex = Random.Range(0, possibleDestinations.Length);
+        return index;
+    }
 
-        // Set the agent's destination
-        agent.SetDestination(possibleDestinations[destinationIndex].position);
+    private static float CalculatePathLength(NavMeshPath path)
+    {
+        float length = 0;
+        if (path.corners.Length < 2) return length;
+
+        for (int i = 0; i < path.corners.Length - 1; i++)
+        {
+            length += Vector3.Distance(path.corners[i], path.corners[i + 1]);
+        }
+
+        return length;
     }
 }
